@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Processes Monitor</title>
+    <style>
+        .grid-container {                
+                display: grid;                
+                grid-template-columns: 8em 15em 10em 8em;                
+            }
+        .grid-item {
+            border: solid 2px #c7c7c7;
+            text-align:center;
+            font-size: 1.1em;
+            padding: 1.5em;            
+        }
+    </style>
+</head>
+<body>
+    <input type="button" id="getBtn" value="Get Processes"/>
+    <div id="main">
+        <div id="highloadCpu" hidden="true">Warning! CPU usage has exceeded 80%</div>
+        <div id="highloadMemory" hidden="true">Warning! Available memory is running low!</div>        
+        <div class="grid-container">
+            <div class="grid-item">Id</div>
+            <div class="grid-item">Process name</div>
+            <div class="grid-item">Cpu Usage Percentage</div>
+            <div class="grid-item">Memory Usage(Mb)</div>            
+            <div class="grid-container" id="processTable"></div>
+        </div>
+    </div>    
+    <script src="wwwroot/lib/signalr/signalr.js"></script>    
+    <script>  
+        var url = "https://localhost:7131";
+         
+        const hubConnection = new signalR.HubConnectionBuilder()
+        .withUrl(url + "/highload", 
+        {
+            skipNegotiation: true,
+            transport: signalR.HttpTransportType.WebSockets
+        })
+        .withAutomaticReconnect()
+        .configureLogging(signalR.LogLevel.Information).build();
+ 
+        document.getElementById("getBtn").addEventListener("click", getProcessesAsync);
+
+        async function getProcessesAsync(event){
+            event.preventDefault();
+
+            const response = await fetch(url + "/Processes");
+            processTable.innerHTML = '';
+
+            if(response.status = 200){
+                let processTable = document.getElementById("processTable");               
+
+                response.json().then((data) =>
+                data.forEach(element => {
+                    var idElement = document.createElement('div');
+                    idElement.className = 'grid-item';
+                    idElement.textContent = element['id'];
+                    processTable.appendChild(idElement);
+
+                    var processname = document.createElement('div');
+                    processname.className = 'grid-item';
+                    processname.textContent = element['processName'];
+                    processTable.appendChild(processname);
+
+                    var memoryusage = document.createElement('div');
+                    memoryusage.className = 'grid-item';
+                    memoryusage.textContent = element['cpuUsage'];
+                    processTable.appendChild(memoryusage);
+
+                    var cpuusage = document.createElement('div');
+                    cpuusage.className = 'grid-item';
+                    cpuusage.textContent = element['memoryUsage'];
+                    processTable.appendChild(cpuusage);                    
+                })    
+                );
+            }            
+        }
+ 
+        hubConnection.on("ReceiveMemoryHighLoad", function(message) { 
+            if(message == true){
+                document.getElementById("highloadMemory").hidden = false;
+            }
+            else{
+                document.getElementById("highloadMemory").hidden = true;                
+            }   
+        });
+
+        hubConnection.on("ReceiveCpuHighLoad", function(message) {           
+            if(message == true){
+                document.getElementById("highloadCpu").hidden = false;
+            }
+            else{
+                document.getElementById("highloadCpu").hidden = true;                
+            }            
+        });
+ 
+        hubConnection.start();
+    </script>
+</body>
+</html>
